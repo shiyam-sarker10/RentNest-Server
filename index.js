@@ -11,11 +11,12 @@ const app = express()
 // M4MQFDSAzWdVPFhr
 
 // middleware
-app.use(cors({
-  origin: ["http://localhost:5173"],
-  credentials: true,
-  
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://client-indol-nine.vercel.app"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 
@@ -33,16 +34,15 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     
-    await client.connect();
+    
     const userCollection = client.db("RentNest").collection("users");
+    const homeCollection = client.db("RentNest").collection("homes");
     await userCollection.createIndex({ email: 1 }, { unique: true });
 
     
     // Posting user info when registaring 
     app.post("/register", async (req, res) => {
       const { name,email,number,role, password } = req.body;
-
-
 
       try {
         // Hash the password using bcrypt
@@ -60,6 +60,81 @@ async function run() {
           console.error('Error registering user:', error);
           res.status(500).json({ success: false, message: "Internal server error" });
         }
+      }
+    });
+
+    // Adding New Home 
+    app.post("/newHomes", async (req, res) => {
+      const {
+        name,
+        address,
+        city,
+        bedrooms,
+        bathrooms,
+        roomSize,
+        image,
+        date,
+        rent,
+        number,
+        desc,
+        status,
+        email,
+        OwnerName,
+      } = req.body;
+
+      try {
+        
+
+        const result = await homeCollection.insertOne({
+          name,
+          address,
+          city,
+          bedrooms,
+          bathrooms,
+          roomSize,
+          image,
+          date,
+          rent,
+          number,
+          desc,
+          status,
+          email,
+          OwnerName,
+});
+
+        res.send(result);
+      } catch (error) {
+        if (error.code === 11000) {
+          // Duplicate key error (email is not unique)
+          res.status(400).json({ success: false, message: "Email is already registered" });
+        } else {
+          // Other errors
+          console.error('Error registering user:', error);
+          res.status(500).json({ success: false, message: "Internal server error" });
+        }
+      }
+    });
+
+    app.get("/newHomes", async (req, res) => {
+      try {
+        const { email } = req.query;
+        const query = { email: email };
+        const result = await homeCollection.find(query).toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+    app.get("/allHomes", async (req, res) => {
+      try {
+        const result = await homeCollection.find().toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
       }
     });
 
@@ -97,11 +172,12 @@ async function run() {
         }
       }
     });
+  
 
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
